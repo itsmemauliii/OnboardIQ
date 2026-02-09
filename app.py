@@ -27,8 +27,10 @@ CREATE TABLE IF NOT EXISTS chats (
 )
 """)
 conn.commit()
-if "current_user" not in st.session_state:
-    st.session_state.current_user = None
+if st.session_state.current_user:
+    cursor.execute("SELECT stage FROM progress WHERE user = ?", (st.session_state.current_user,))
+    completed_stages = [row[0] for row in cursor.fetchall()]
+    st.session_state.completed = completed_stages
 
 if st.session_state.current_user is None:
     st.title("🍕 Welcome to OnboardIQ")
