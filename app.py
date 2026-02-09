@@ -27,6 +27,16 @@ CREATE TABLE IF NOT EXISTS chats (
 )
 """)
 conn.commit()
+if "current_user" not in st.session_state:
+    st.session_state.current_user = None
+
+if st.session_state.current_user is None:
+    st.title("🍕 Welcome to OnboardIQ")
+    username = st.text_input("Enter your username to start your session", key="login")
+    if st.button("Login"):
+        if username.strip() != "":
+            st.session_state.current_user = username.strip()
+            st.experimental_rerun()
 
 # -------------------------
 # ONBOARDING STAGES + FLAVORS
