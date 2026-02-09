@@ -23,22 +23,11 @@ CREATE TABLE IF NOT EXISTS progress (
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS chats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user TEXT,
     message TEXT
 )
 """)
 conn.commit()
-if st.session_state.current_user:
-    cursor.execute("SELECT stage FROM progress WHERE user = ?", (st.session_state.current_user,))
-    completed_stages = [row[0] for row in cursor.fetchall()]
-    st.session_state.completed = completed_stages
-
-if st.session_state.current_user is None:
-    st.title("🍕 Welcome to OnboardIQ")
-    username = st.text_input("Enter your username to start your session", key="login")
-    if st.button("Login"):
-        if username.strip() != "":
-            st.session_state.current_user = username.strip()
-            st.experimental_rerun()
 
 # -------------------------
 # ONBOARDING STAGES + FLAVORS
@@ -76,6 +65,9 @@ CHEESY_LINES = [
 # -------------------------
 st.set_page_config(layout="wide", page_title="OnboardIQ", page_icon="🍕")
 
+if "current_user" not in st.session_state:
+    st.session_state.current_user = None
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -84,6 +76,23 @@ if "completed" not in st.session_state:
 
 if "section" not in st.session_state:
     st.session_state.section = "User"
+
+# -------------------------
+# LOGIN SECTION
+# -------------------------
+if st.session_state.current_user is None:
+    st.title("🍕 Welcome to OnboardIQ")
+    username = st.text_input("Enter your username to start your session", key="login")
+    if st.button("Login"):
+        if username.strip() != "":
+            st.session_state.current_user = username.strip()
+            # Load previous progress for user
+            cursor.execute("SELECT stage FROM progress WHERE user = ?", (st.session_state.current_user,))
+            st.session_state.completed = [row[0] for row in cursor.fetchall()]
+            cursor.execute("SELECT message, user FROM chats WHERE user = ?", (st.session_state.current_user,))
+            st.session_state.messages = [{"role": "user" if u=="user" else "assistant", "content": m} for m, u in cursor.fetchall()]
+            st.experimental_rerun()
+    st.stop()  # stop until login
 
 # -------------------------
 # NAVIGATION
@@ -155,7 +164,8 @@ def generate_response(user_input):
         if keyword in lower:
             if stage not in st.session_state.completed:
                 st.session_state.completed.append(stage)
-                cursor.execute("INSERT INTO progress (user, stage) VALUES (?, ?)", ("demo_user", stage))
+                cursor.execute("INSERT INTO progress (user, stage) VALUES (?, ?)", 
+                               (st.session_state.current_user, stage))
                 conn.commit()
                 human_line = random.choice(CHEESY_LINES)
                 if len(st.session_state.completed) == len(STAGES):
@@ -173,7 +183,7 @@ def generate_response(user_input):
 # USER SECTION
 # -------------------------
 if st.session_state.section == "User":
-    st.title("🍕 OnboardIQ")
+    st.title(f"🍕 OnboardIQ (User: {st.session_state.current_user})")
     st.write("Guide users to success, slice by slice 👨‍🍳💼")
 
     col1, col2 = st.columns([2, 1])
@@ -186,7 +196,8 @@ if st.session_state.section == "User":
 
         if user_input:
             st.session_state.messages.append({"role": "user", "content": user_input})
-            cursor.execute("INSERT INTO chats (message) VALUES (?)", (user_input,))
+            cursor.execute("INSERT INTO chats (user, message) VALUES (?, ?)", 
+                           (st.session_state.current_user, user_input))
             conn.commit()
             response = generate_response(user_input)
             time.sleep(0.3)
@@ -216,9 +227,13 @@ if st.session_state.section == "Admin":
     for stage, count in stage_data:
         st.write(f"{stage} → {count} completions")
 
-    cursor.execute("SELECT COUNT(DISTINCT user) FROM progress")
-    users = cursor.fetchone()[0]
-    st.metric("Users Started Onboarding", users)
+    st.subheader("User Progress Overview")
+    cursor.execute("SELECT DISTINCT user FROM progress")
+    users = [row[0] for row in cursor.fetchall()]
+    for user in users:
+        cursor.execute("SELECT stage FROM progress WHERE user = ?", (user,))
+        completed = [row[0] for row in cursor.fetchall()]
+        st.write(f"**{user}** → {len(completed)}/{len(STAGES)} slices completed")
 
 # -------------------------
 # ABOUT SECTION
@@ -232,7 +247,7 @@ if st.session_state.section == "About App":
 - **Animated pizza slices** fill clockwise as milestones complete.
 - **Flavor labels appear inside slices** with emoji + name.
 - **Cheesy humanized chatbot lines** keep users engaged.
-- **Admin dashboard** tracks completion rates and bottlenecks.
+- **Admin dashboard** tracks completion rates and per-user progress.
 - Built entirely in **Streamlit**, no external APIs.
 
 This is designed to **increase activation and reduce drop-offs** while keeping onboarding fun and human.
