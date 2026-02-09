@@ -42,11 +42,11 @@ STAGES = [
 COLORS = ["#FFB347", "#FF9933", "#FFD700", "#FF4500", "#FF6347", "#FF69B4"]
 
 CHEESY_LINES = [
-    "Oops, chef 😅—we can’t skip a slice. Let’s add that before serving.",
+    "Oops, chef 😅We can’t skip a slice. Let’s add that before serving.",
     "Every slice counts. Don’t leave your users hungry for success!",
     "Keep rolling, chef! Your onboarding masterpiece awaits 👨‍🍳✨.",
     "Your pizza’s almost ready… just a few more layers of brilliance.",
-    "Smells like success already—don’t burn it!"
+    "Smells like success already. Don’t burn it!"
 ]
 
 # -------------------------
