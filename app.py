@@ -41,10 +41,10 @@ STAGES = [
 ]
 
 FLAVORS = [
-    "🍕 Margherita Stage",
-    "🌶 Pepperoni Progress",
-    "🧀 Cheesy Configuration",
-    "🥦 Veggie Upload",
+    "🍕 Margherita",
+    "🌶 Pepperoni",
+    "🧀 Cheesy",
+    "🥦 Veggie",
     "🔥 Bake & Blend",
     "👑 Supreme Serve"
 ]
@@ -90,12 +90,12 @@ def polar_to_cartesian(cx, cy, r, angle):
     return x, y
 
 # -------------------------
-# RENDER ANIMATED PIZZA WITH FLAVOR LABELS
+# RENDER ANIMATED PIZZA WITH LABELS INSIDE SLICES
 # -------------------------
-def render_pizza_animated():
+def render_pizza_with_labels():
     num_slices = len(STAGES)
     cx, cy, r = 150, 150, 140
-    svg_paths = ""
+    svg_slices = ""
 
     for i in range(num_slices):
         start_angle = (i / num_slices) * 360
@@ -104,9 +104,11 @@ def render_pizza_animated():
 
         x1, y1 = polar_to_cartesian(cx, cy, r, start_angle)
         x2, y2 = polar_to_cartesian(cx, cy, r, end_angle)
-
         large_arc = 1 if (end_angle - start_angle) > 180 else 0
 
+        # Mid-angle for label
+        mid_angle = (start_angle + end_angle) / 2
+        label_x, label_y = polar_to_cartesian(cx, cy, r * 0.6, mid_angle)
         flavor_label = FLAVORS[i]
 
         path = f"""
@@ -115,19 +117,21 @@ def render_pizza_animated():
             <title>{flavor_label}</title>
             <animate attributeName="fill" from="#f2f2f2" to="{color}" dur="0.8s" fill="freeze"/>
         </path>
+        <text x="{label_x}" y="{label_y}" font-size="14" text-anchor="middle" alignment-baseline="middle"
+              fill="#333" font-weight="bold">{flavor_label}</text>
         """
-        svg_paths += path
+        svg_slices += path
 
     html(f"""
     <div style="text-align:center;">
         <svg width="300" height="300" viewBox="0 0 300 300">
-            {svg_paths}
+            {svg_slices}
             <circle cx="{cx}" cy="{cy}" r="{r}" fill="transparent" stroke="#333" stroke-width="2"/>
         </svg>
         <h3>{int(len(st.session_state.completed)/num_slices*100)}% Progress</h3>
-        <p style="font-weight:bold;">Hover on slices to see stage flavor names!</p>
+        <p style="font-weight:bold;">Hover on slices to see tooltip flavor names!</p>
     </div>
-    """, height=350)
+    """, height=380)
 
 # -------------------------
 # CHATBOT LOGIC
@@ -178,7 +182,7 @@ if st.session_state.section == "User":
             st.rerun()
 
     with col2:
-        render_pizza_animated()
+        render_pizza_with_labels()
         if len(st.session_state.completed) == len(STAGES):
             st.success("🎉 All onboarding milestones completed! Users are live 🚀")
 
@@ -214,7 +218,7 @@ if st.session_state.section == "About App":
 
 - Users progress **slice by slice** through milestones.
 - **Animated pizza slices** fill clockwise as milestones complete.
-- **Flavor names appear on hover** for each slice.
+- **Flavor labels appear inside slices** with emoji + name.
 - **Cheesy humanized chatbot lines** keep users engaged.
 - **Admin dashboard** tracks completion rates and bottlenecks.
 - Built entirely in **Streamlit**, no external APIs.
