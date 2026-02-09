@@ -19,6 +19,11 @@ CREATE TABLE IF NOT EXISTS progress (
     stage TEXT
 )
 """)
+try:
+    cursor.execute("ALTER TABLE chats ADD COLUMN user TEXT")
+except sqlite3.OperationalError:
+    pass  # column already exists
+conn.commit()
 
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS chats (
