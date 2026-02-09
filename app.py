@@ -125,7 +125,7 @@ def generate_response(user_input):
 
 if st.session_state.view == "user":
 
-    st.title("🍕 AI Pizza Onboarding Assistant")
+    st.title("🍕 OnboardIQ")
     st.write("Let’s cook your success pizza 👨‍🍳")
 
     col1, col2 = st.columns([2, 1])
