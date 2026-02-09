@@ -12,6 +12,7 @@ import math
 conn = sqlite3.connect("onboardiq.db", check_same_thread=False)
 cursor = conn.cursor()
 
+# Create progress table
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS progress (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -19,12 +20,8 @@ CREATE TABLE IF NOT EXISTS progress (
     stage TEXT
 )
 """)
-try:
-    cursor.execute("ALTER TABLE chats ADD COLUMN user TEXT")
-except sqlite3.OperationalError:
-    pass  # column already exists
-conn.commit()
 
+# Create chats table
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS chats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,6 +29,13 @@ CREATE TABLE IF NOT EXISTS chats (
     message TEXT
 )
 """)
+
+# Ensure 'user' column exists in chats (for older DBs)
+try:
+    cursor.execute("ALTER TABLE chats ADD COLUMN user TEXT")
+except sqlite3.OperationalError:
+    pass  # column already exists
+
 conn.commit()
 
 # -------------------------
@@ -62,7 +66,7 @@ CHEESY_LINES = [
     "Every slice counts. Don’t leave your users hungry for success!",
     "Keep rolling, chef! Your onboarding masterpiece awaits 👨‍🍳✨.",
     "Your pizza’s almost ready… just a few more layers of brilliance.",
-    "Smells like success already, Don’t burn it!"
+    "Smells like success already. Don’t burn it!"
 ]
 
 # -------------------------
@@ -70,20 +74,20 @@ CHEESY_LINES = [
 # -------------------------
 st.set_page_config(layout="wide", page_title="OnboardIQ", page_icon="🍕")
 
+# -------------------------
+# SESSION STATE INIT
+# -------------------------
 if "current_user" not in st.session_state:
     st.session_state.current_user = None
-
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
 if "completed" not in st.session_state:
     st.session_state.completed = []
-
 if "section" not in st.session_state:
     st.session_state.section = "User"
 
 # -------------------------
-# LOGIN SECTION
+# LOGIN
 # -------------------------
 if st.session_state.current_user is None:
     st.title("🍕 Welcome to OnboardIQ")
@@ -91,13 +95,19 @@ if st.session_state.current_user is None:
     if st.button("Login"):
         if username.strip() != "":
             st.session_state.current_user = username.strip()
-            # Load previous progress for user
+            # Load previous progress
             cursor.execute("SELECT stage FROM progress WHERE user = ?", (st.session_state.current_user,))
             st.session_state.completed = [row[0] for row in cursor.fetchall()]
-            cursor.execute("SELECT message, user FROM chats WHERE user = ?", (st.session_state.current_user,))
-            st.session_state.messages = [{"role": "user" if u=="user" else "assistant", "content": m} for m, u in cursor.fetchall()]
+            # Load previous chats
+            cursor.execute("SELECT message, 'assistant' FROM chats WHERE user = ? AND user!='user'", 
+                           (st.session_state.current_user,))
+            assistant_msgs = [{"role":"assistant","content":m[0]} for m in cursor.fetchall()]
+            cursor.execute("SELECT message, 'user' FROM chats WHERE user = ?", 
+                           (st.session_state.current_user,))
+            user_msgs = [{"role":"user","content":m[0]} for m in cursor.fetchall()]
+            st.session_state.messages = sorted(assistant_msgs + user_msgs, key=lambda x: x.get("timestamp", 0))
             st.experimental_rerun()
-    st.stop()  # stop until login
+    st.stop()
 
 # -------------------------
 # NAVIGATION
@@ -116,7 +126,7 @@ def polar_to_cartesian(cx, cy, r, angle):
     return x, y
 
 # -------------------------
-# RENDER ANIMATED PIZZA WITH LABELS INSIDE SLICES
+# RENDER PIZZA WITH LABELS
 # -------------------------
 def render_pizza_with_labels():
     num_slices = len(STAGES)
@@ -132,15 +142,13 @@ def render_pizza_with_labels():
         x2, y2 = polar_to_cartesian(cx, cy, r, end_angle)
         large_arc = 1 if (end_angle - start_angle) > 180 else 0
 
-        # Mid-angle for label
-        mid_angle = (start_angle + end_angle) / 2
-        label_x, label_y = polar_to_cartesian(cx, cy, r * 0.6, mid_angle)
+        mid_angle = (start_angle + end_angle)/2
+        label_x, label_y = polar_to_cartesian(cx, cy, r*0.6, mid_angle)
         flavor_label = FLAVORS[i]
 
         path = f"""
         <path d="M {cx} {cy} L {x1} {y1} A {r} {r} 0 {large_arc} 1 {x2} {y2} Z"
               fill="{color}" stroke="#fff" stroke-width="2">
-            <title>{flavor_label}</title>
             <animate attributeName="fill" from="#f2f2f2" to="{color}" dur="0.8s" fill="freeze"/>
         </path>
         <text x="{label_x}" y="{label_y}" font-size="14" text-anchor="middle" alignment-baseline="middle"
@@ -155,7 +163,7 @@ def render_pizza_with_labels():
             <circle cx="{cx}" cy="{cy}" r="{r}" fill="transparent" stroke="#333" stroke-width="2"/>
         </svg>
         <h3>{int(len(st.session_state.completed)/num_slices*100)}% Progress</h3>
-        <p style="font-weight:bold;">Hover on slices to see tooltip flavor names!</p>
+        <p style="font-weight:bold;">Hover on slices to see flavor labels!</p>
     </div>
     """, height=380)
 
@@ -207,7 +215,7 @@ if st.session_state.section == "User":
             response = generate_response(user_input)
             time.sleep(0.3)
             st.session_state.messages.append({"role": "assistant", "content": response})
-            st.rerun()
+            st.experimental_rerun()
 
     with col2:
         render_pizza_with_labels()
