@@ -4,6 +4,7 @@ import sqlite3
 import random
 import time
 from streamlit.components.v1 import html
+import math
 
 # -------------------------
 # DATABASE SETUP
@@ -28,7 +29,7 @@ CREATE TABLE IF NOT EXISTS chats (
 conn.commit()
 
 # -------------------------
-# ONBOARDING STAGES
+# ONBOARDING STAGES + FLAVORS
 # -------------------------
 STAGES = [
     "Dough - Create Account",
@@ -39,6 +40,15 @@ STAGES = [
     "Serve - Go Live"
 ]
 
+FLAVORS = [
+    "🍕 Margherita Stage",
+    "🌶 Pepperoni Progress",
+    "🧀 Cheesy Configuration",
+    "🥦 Veggie Upload",
+    "🔥 Bake & Blend",
+    "👑 Supreme Serve"
+]
+
 COLORS = ["#FFB347", "#FF9933", "#FFD700", "#FF4500", "#FF6347", "#FF69B4"]
 
 CHEESY_LINES = [
@@ -46,7 +56,7 @@ CHEESY_LINES = [
     "Every slice counts. Don’t leave your users hungry for success!",
     "Keep rolling, chef! Your onboarding masterpiece awaits 👨‍🍳✨.",
     "Your pizza’s almost ready… just a few more layers of brilliance.",
-    "Smells like success already. Don’t burn it!"
+    "Smells like success already, Don’t burn it!"
 ]
 
 # -------------------------
@@ -64,42 +74,58 @@ if "section" not in st.session_state:
     st.session_state.section = "User"
 
 # -------------------------
-# NAVIGATION SECTIONS
+# NAVIGATION
 # -------------------------
 st.sidebar.title("🍕 OnboardIQ Sections")
 section = st.sidebar.radio("Navigate to:", ["User", "Admin", "About App"])
 st.session_state.section = section
 
 # -------------------------
-# ANIMATED SLICE PIZZA FUNCTION
+# HELPER: POLAR TO CARTESIAN
 # -------------------------
-def render_pizza_animation():
-    completed = len(st.session_state.completed)
+def polar_to_cartesian(cx, cy, r, angle):
+    rad = math.radians(angle)
+    x = cx + r * math.cos(rad)
+    y = cy + r * math.sin(rad)
+    return x, y
+
+# -------------------------
+# RENDER ANIMATED PIZZA WITH FLAVOR LABELS
+# -------------------------
+def render_pizza_animated():
     num_slices = len(STAGES)
-    # SVG pie slices
-    svg_slices = ""
-    start_angle = 0
+    cx, cy, r = 150, 150, 140
+    svg_paths = ""
+
     for i in range(num_slices):
-        end_angle = start_angle + (360 / num_slices)
-        color = COLORS[i] if i < completed else "#f2f2f2"
-        svg_slices += f"""
-        <path d="
-            M 150 150
-            L {150 + 150 * round(random.uniform(0.9,1),2) * round(random.uniform(0.95,1),2)*st.session_state.completed.count(STAGES[i])*0.1} {150 + 150 * round(random.uniform(0.9,1),2)}
-            A 150 150 0 0 1 {150 + 150 * round(random.uniform(0.9,1),2)} {150 - 150 * round(random.uniform(0.9,1),2)}
-            Z
-        " fill="{color}" stroke="#fff" stroke-width="2">
-            <animate attributeName="fill" from="#f2f2f2" to="{color}" dur="1s" fill="freeze"/>
+        start_angle = (i / num_slices) * 360
+        end_angle = ((i + 1) / num_slices) * 360
+        color = COLORS[i] if i < len(st.session_state.completed) else "#f2f2f2"
+
+        x1, y1 = polar_to_cartesian(cx, cy, r, start_angle)
+        x2, y2 = polar_to_cartesian(cx, cy, r, end_angle)
+
+        large_arc = 1 if (end_angle - start_angle) > 180 else 0
+
+        flavor_label = FLAVORS[i]
+
+        path = f"""
+        <path d="M {cx} {cy} L {x1} {y1} A {r} {r} 0 {large_arc} 1 {x2} {y2} Z"
+              fill="{color}" stroke="#fff" stroke-width="2">
+            <title>{flavor_label}</title>
+            <animate attributeName="fill" from="#f2f2f2" to="{color}" dur="0.8s" fill="freeze"/>
         </path>
         """
-        start_angle = end_angle
+        svg_paths += path
+
     html(f"""
     <div style="text-align:center;">
         <svg width="300" height="300" viewBox="0 0 300 300">
-            {svg_slices}
-            <circle cx="150" cy="150" r="140" fill="transparent" stroke="#333" stroke-width="2"/>
+            {svg_paths}
+            <circle cx="{cx}" cy="{cy}" r="{r}" fill="transparent" stroke="#333" stroke-width="2"/>
         </svg>
-        <h3>{int((completed / num_slices)*100)}% Progress</h3>
+        <h3>{int(len(st.session_state.completed)/num_slices*100)}% Progress</h3>
+        <p style="font-weight:bold;">Hover on slices to see stage flavor names!</p>
     </div>
     """, height=350)
 
@@ -116,7 +142,6 @@ def generate_response(user_input):
                 cursor.execute("INSERT INTO progress (user, stage) VALUES (?, ?)", ("demo_user", stage))
                 conn.commit()
                 human_line = random.choice(CHEESY_LINES)
-                # Confetti for final milestone
                 if len(st.session_state.completed) == len(STAGES):
                     st.balloons()
                 return f"✅ {stage} completed! {human_line}"
@@ -132,7 +157,7 @@ def generate_response(user_input):
 # USER SECTION
 # -------------------------
 if st.session_state.section == "User":
-    st.title("🍕 OnboardIQ – AI-Powered Onboarding Intelligence")
+    st.title("🍕 OnboardIQ")
     st.write("Guide users to success, slice by slice 👨‍🍳💼")
 
     col1, col2 = st.columns([2, 1])
@@ -148,12 +173,12 @@ if st.session_state.section == "User":
             cursor.execute("INSERT INTO chats (message) VALUES (?)", (user_input,))
             conn.commit()
             response = generate_response(user_input)
-            time.sleep(0.5)
+            time.sleep(0.3)
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.rerun()
 
     with col2:
-        render_pizza_animation()
+        render_pizza_animated()
         if len(st.session_state.completed) == len(STAGES):
             st.success("🎉 All onboarding milestones completed! Users are live 🚀")
 
@@ -180,7 +205,7 @@ if st.session_state.section == "Admin":
     st.metric("Users Started Onboarding", users)
 
 # -------------------------
-# ABOUT APP SECTION
+# ABOUT SECTION
 # -------------------------
 if st.session_state.section == "About App":
     st.title("🍕 About OnboardIQ")
@@ -188,11 +213,12 @@ if st.session_state.section == "About App":
 **OnboardIQ** transforms SaaS onboarding into an interactive, gamified journey.
 
 - Users progress **slice by slice** through milestones.
-- **Animated pizza** shows progress visually.
+- **Animated pizza slices** fill clockwise as milestones complete.
+- **Flavor names appear on hover** for each slice.
 - **Cheesy humanized chatbot lines** keep users engaged.
-- **Admin dashboard** tracks completion rates and milestone bottlenecks.
+- **Admin dashboard** tracks completion rates and bottlenecks.
 - Built entirely in **Streamlit**, no external APIs.
 
 This is designed to **increase activation and reduce drop-offs** while keeping onboarding fun and human.
     """)
-    st.info("Navigation: Use the sidebar to switch between User, Admin, and About sections.")
+    st.info("Use the sidebar to navigate between User, Admin, and About App sections.")
