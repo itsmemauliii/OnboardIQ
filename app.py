@@ -3,7 +3,6 @@ import streamlit as st
 import sqlite3
 import random
 import time
-from streamlit_extras.switch_page_button import switch_page
 from streamlit.components.v1 import html
 
 # -------------------------
@@ -40,12 +39,14 @@ STAGES = [
     "Serve - Go Live"
 ]
 
+COLORS = ["#FFB347", "#FF9933", "#FFD700", "#FF4500", "#FF6347", "#FF69B4"]
+
 CHEESY_LINES = [
-    "Oops, chef 😅we can’t skip a slice. Let’s add that before serving.",
+    "Oops, chef 😅—we can’t skip a slice. Let’s add that before serving.",
     "Every slice counts. Don’t leave your users hungry for success!",
     "Keep rolling, chef! Your onboarding masterpiece awaits 👨‍🍳✨.",
     "Your pizza’s almost ready… just a few more layers of brilliance.",
-    "Smells like success already. Don’t burn it!"
+    "Smells like success already—don’t burn it!"
 ]
 
 # -------------------------
@@ -70,32 +71,37 @@ section = st.sidebar.radio("Navigate to:", ["User", "Admin", "About App"])
 st.session_state.section = section
 
 # -------------------------
-# PIZZA RENDER FUNCTION
+# ANIMATED SLICE PIZZA FUNCTION
 # -------------------------
-def render_pizza_3d():
+def render_pizza_animation():
     completed = len(st.session_state.completed)
-    percent = int((completed / len(STAGES)) * 100)
-
-    # 3D-ish style conic-gradient
+    num_slices = len(STAGES)
+    # SVG pie slices
+    svg_slices = ""
+    start_angle = 0
+    for i in range(num_slices):
+        end_angle = start_angle + (360 / num_slices)
+        color = COLORS[i] if i < completed else "#f2f2f2"
+        svg_slices += f"""
+        <path d="
+            M 150 150
+            L {150 + 150 * round(random.uniform(0.9,1),2) * round(random.uniform(0.95,1),2)*st.session_state.completed.count(STAGES[i])*0.1} {150 + 150 * round(random.uniform(0.9,1),2)}
+            A 150 150 0 0 1 {150 + 150 * round(random.uniform(0.9,1),2)} {150 - 150 * round(random.uniform(0.9,1),2)}
+            Z
+        " fill="{color}" stroke="#fff" stroke-width="2">
+            <animate attributeName="fill" from="#f2f2f2" to="{color}" dur="1s" fill="freeze"/>
+        </path>
+        """
+        start_angle = end_angle
     html(f"""
-    <div style="text-align:center; margin-top:30px;">
-        <div style="
-            width:250px;
-            height:250px;
-            border-radius:50%;
-            background: conic-gradient(
-                #ff9933 {percent}%,
-                #f2f2f2 {percent}% 100%
-            );
-            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
-            transform: rotate(-20deg);
-            margin:auto;
-            transition: all 0.5s ease-in-out;
-        ">
-        </div>
-        <h3 style="margin-top:10px;">{percent}% Progress</h3>
+    <div style="text-align:center;">
+        <svg width="300" height="300" viewBox="0 0 300 300">
+            {svg_slices}
+            <circle cx="150" cy="150" r="140" fill="transparent" stroke="#333" stroke-width="2"/>
+        </svg>
+        <h3>{int((completed / num_slices)*100)}% Progress</h3>
     </div>
-    """, height=300)
+    """, height=350)
 
 # -------------------------
 # CHATBOT LOGIC
@@ -110,7 +116,7 @@ def generate_response(user_input):
                 cursor.execute("INSERT INTO progress (user, stage) VALUES (?, ?)", ("demo_user", stage))
                 conn.commit()
                 human_line = random.choice(CHEESY_LINES)
-                # Trigger confetti when last milestone
+                # Confetti for final milestone
                 if len(st.session_state.completed) == len(STAGES):
                     st.balloons()
                 return f"✅ {stage} completed! {human_line}"
@@ -147,7 +153,7 @@ if st.session_state.section == "User":
             st.rerun()
 
     with col2:
-        render_pizza_3d()
+        render_pizza_animation()
         if len(st.session_state.completed) == len(STAGES):
             st.success("🎉 All onboarding milestones completed! Users are live 🚀")
 
